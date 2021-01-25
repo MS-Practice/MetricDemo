@@ -2,6 +2,10 @@
 
 - [术语](GLOSSARY.md)
 
+# 参考资料
+
+- https://prometheus.io/docs/introduction/overview/
+
 # Prometheus
 
 ## 特征
