@@ -1,6 +1,12 @@
 # 导航
 
 - [术语](GLOSSARY.md)
+- [数据模型](DataModel.md)
+- [度量类型](MetricType.md)
+- [Job 与示例](Jobs-And-Instances.md)
+- [配置](Configuration.md)
+- [存储](Storage.md)
+- [联合](Federation.md)
 
 # 参考资料
 
@@ -51,3 +57,89 @@ Prometheus 值的可靠性。你可以实时展示你系统的那些数据，即
 
 https://prometheus.io/docs/introduction/first_steps/#downloading-prometheus
 
+## 配置 Prometheus 监控目标样本（sample targets）
+
+我们现在这些要监控的目标样本：http://localhost:8080/metrics、http://localhost:8081/metrics、http://localhost:8082/metrics。
+
+现在我们要配置收集这些目标样本。我们先把这三个终结点分组到一个作业里，称为 `node`。假设我们两个是生产节点，还有一个是测试节点。为了在 Prometheus 中模拟这一点，我们可以在单个任务中添加几组端点，并为每组目标添加额外的标签。在这个例子中，我们添加组 `group="production"` 标签到第一组目标中，给第二组添加 `group="canary"`。
+
+为了达到目的，我们在 `prometheus.yml` 中添加定义如下 `scrape_configs` 节点，并重启 Prometheus 实例：
+
+```yaml
+scrape_configs:
+  - job_name:       'node'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['localhost:8080', 'localhost:8081']
+        labels:
+          group: 'production'
+
+      - targets: ['localhost:8082']
+        labels:
+          group: 'canary'
+```
+
+转到表达式浏览器，检查 Prometheus 现在是否有关于这些样本终结点暴露的时间序列的信息，例如 node_cpu_seconds_total。
+
+## 配置将收集的数据聚合到新的时间序列的规则
+
+虽然在我们的示例中不是问题，但聚合在数千个时间序列上的查询在特别计算时可能会变慢。为了提高效率，Prometheus 可以通过配置记录规则（recording rules）将表达式预先录制到新的持久时间序列中。假设我们想记录 5 分钟的时间窗口内每个实例所有 cpu 上的平均 cpu 时间（node_cpu_seconds_total）的每秒速率(但保留 `job`、`instance`和 `mode` 维度)。我们可以这样配置：
+
+```yaml
+avg by (job, instance, mode) (rate(node_cpu_seconds_total[5m]))
+```
+
+试着把这个表达式画出来。
+
+将这个表达式产生的时间序列记录到一个名为 `job_instance_mode:node_cpu_seconds:avg_rate5m` 的新度量中，按照下面的规则创建一个文件以 `prometheus.rules.yml` 保存：
+
+```yaml
+groups:
+- name: cpu-node
+  rules:
+  - record: job_instance_mode:node_cpu_seconds:avg_rate5m
+    expr: avg by (job, instance, mode) (rate(node_cpu_seconds_total[5m]))
+```
+
+为了让 Prometheus 应用新的规则，添加 `rule_files` 语句到 `prometheus.yml` 中。配置文件内容如下：
+
+```yaml
+global:
+  scrape_interval:     15s # By default, scrape targets every 15 seconds.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds.
+
+  # Attach these extra labels to all timeseries collected by this Prometheus instance.
+  external_labels:
+    monitor: 'codelab-monitor'
+
+rule_files:
+  - 'prometheus.rules.yml'
+
+scrape_configs:
+  - job_name: 'prometheus'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name:       'node'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['localhost:8080', 'localhost:8081']
+        labels:
+          group: 'production'
+
+      - targets: ['localhost:8082']
+        labels:
+          group: 'canary'
+```
+
+重启服务，并通过表达式浏览器查询或绘图来验证度量名称为 `job_instance_mode:node_cpu_seconds:avg_rate5m` 新的时间序列是否可用。
