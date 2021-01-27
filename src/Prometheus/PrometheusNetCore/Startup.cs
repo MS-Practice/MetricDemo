@@ -32,42 +32,15 @@ namespace PrometheusNetCore
         public void ConfigureServices(IServiceCollection services)
         {
             #region Metrics
-            var metricsRoot = AppMetrics.CreateDefaultBuilder()
-                .OutputMetrics.AsPrometheusPlainText()
-                .OutputMetrics.AsPrometheusProtobuf()
-                .Build();
-            services.AddMetrics(metricsRoot);
-            //services.AddMetrics(builder =>
-            //{
-            //    builder.OutputMetrics.AsPrometheusPlainText();
-            //    builder.OutputMetrics.AsPrometheusProtobuf();
-            //    //builder.UseDatabaseMetrics(option =>
-            //    //{
-            //    //    option.Database = "db_cp_config";
-            //    //    option.DatabaseServer = "http://192.168.3.10";
-            //    //    option.Uid = "root";
-            //    //    option.Password = "123456";
-            //    //    option.Timeout = 10;
-            //    //    option.FlushInterval = 10;
-            //    //});
-            //});
-            services.AddMetricsTrackingMiddleware();
-            services.AddMetricsReportingHostedService();
-
-            services.AddMetricsEndpoints(options =>
-            {
-                options.MetricsEndpointOutputFormatter = new MetricsPrometheusTextOutputFormatter();
-                options.MetricsTextEndpointOutputFormatter = new MetricsPrometheusTextOutputFormatter();
-            });
-
-            services.AddAppMetricsHealthPublishing();
+            services.AddPrometheusCore()
+                .UseHealthCheck(builder =>
+                {
+                    builder.AddHealthCheck<HelloworldHealthCheck>("helloworld_health_check");
+                    builder.AddHealthCheck("helloworld_health_check_unhealth", () => HealthCheckResult.Unhealthy("Example is Unhealth"), tags: new[] { "unhealth" });
+                });
             #endregion
 
             services.AddControllers();
-
-            services.AddHealthChecks()
-                .AddCheck<HelloworldHealthCheck>("helloworld_health_check")
-                .AddCheck("helloworld_health_check_unhealth", () => HealthCheckResult.Unhealthy("Example is Unhealth"), tags: new[] { "unhealth" });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
