@@ -11,6 +11,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PrometheusCore;
+using PrometheusCore.Middlewares;
 using PrometheusNetCore.Healthchecks;
 using System;
 using System.Collections.Generic;
@@ -46,7 +47,8 @@ namespace PrometheusNetCore
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            app.UseMetricsAllMiddleware();
+            app.UseMetricsAllMiddleware()
+                .UseMiddleware<HttpMetricsMiddleware>();
 
             if (env.IsDevelopment())
             {

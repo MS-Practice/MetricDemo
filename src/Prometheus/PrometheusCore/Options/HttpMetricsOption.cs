@@ -6,7 +6,7 @@ namespace PrometheusCore.Options
 {
     public class HttpMetricsOption
     {
-        public bool Enabled { get; set; }
-        public string[] Urls { get; set; }
+        public bool Enabled { get; set; } = false;
+        public string[] Urls { get; set; } = Array.Empty<string>();
     }
 }

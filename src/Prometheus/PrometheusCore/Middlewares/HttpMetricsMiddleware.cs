@@ -1,5 +1,6 @@
 ﻿using App.Metrics;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PrometheusCore.Internals;
@@ -9,6 +10,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace PrometheusCore.Middlewares
@@ -19,6 +21,7 @@ namespace PrometheusCore.Middlewares
         private readonly RequestDelegate _next;
         private readonly IMetrics _metrics;
         private readonly HttpMetricsOption httpMetricsOption;
+        private readonly string appMetricsContextName;
 
         public HttpMetricsMiddleware(RequestDelegate next,
             IConfiguration configuration,
@@ -29,45 +32,14 @@ namespace PrometheusCore.Middlewares
             _metrics = metrics;
             _next = next;
             httpMetricsOption = configuration.GetSection("HttpMetricsOption").Get<HttpMetricsOption>();
+            appMetricsContextName = configuration["MetricsOption:MetricsContextName"];
         }
 
         public async Task Invoke(HttpContext context)
         {
             try
             {
-                if (httpMetricsOption != null && httpMetricsOption.Enabled)
-                {
-                    // 这里去要监控的 url 列表
-                    var watch = new Stopwatch();
-                    //var responseTime = "0";
-                    watch.Start();
-                    //var counter = Metrics.Instance.CreateCounter("prometheus_demo_request_total", "HTTP Requests Total", new CounterConfiguration
-                    //{
-                    //    LabelNames = new[] { "path", "method", "status" }
-                    //});
-
-                    ////只统计成功的时间
-                    //var gauge = Metrics.CreateGauge("http_response_time", "Http Response Time ", new GaugeConfiguration
-                    //{
-                    //    LabelNames = new[] { "path", "method" }
-                    //});
-                    context.Response.OnStarting(() =>
-                    {
-                        // Stop the timer information and calculate the time   
-                        watch.Stop();
-                        //var responseTimeForCompleteRequest = watch.ElapsedMilliseconds;
-                        // Add the Response time information in the Response headers.   
-                        //responseTime = responseTimeForCompleteRequest.ToString();
-                        //if (path != "/metrics")
-                        //{
-                        //    statusCode = httpContext.Response.StatusCode;
-                        //    counter.Labels(path, method, statusCode.ToString()).Inc();
-                        //    gauge.Labels(path, method).Inc();
-                        //    gauge.Set(watch.ElapsedMilliseconds);
-                        //}
-                        return Task.CompletedTask;
-                    });
-                }
+                HttpMetrics(context);
                 await _next(context);
             }
             catch (Exception e)
@@ -75,6 +47,35 @@ namespace PrometheusCore.Middlewares
                 // 最好设定好要监控的地址，不建议监控所有的地址
                 _metrics.Measure.Counter.Increment(MetricsRegistry.HttpRequestCounter, e.Message);
             }
+        }
+
+        private void HttpMetrics(HttpContext context)
+        {
+            if (httpMetricsOption != null && httpMetricsOption.Enabled)
+            {
+                var metrics = MetricsUrlsContains(context);
+                if (metrics.contains)
+                {
+                    var watch = Stopwatch.StartNew();
+                    // 这里去要监控的 url 列表
+                    context.Response.OnStarting(() =>
+                    {
+                        if (metrics.contains)
+                        {
+                            watch.Stop();
+                            _metrics.RecordEndpointsRequestTime(metrics.url, appMetricsContextName, watch.ElapsedMilliseconds);
+                        }
+                        return Task.CompletedTask;
+                    });
+                }
+            }
+        }
+
+        private (bool contains, string url) MetricsUrlsContains(HttpContext context)
+        {
+            string url = context.Request.Path;
+            var contains = httpMetricsOption.Urls.Any(p => Regex.IsMatch(url, p, RegexOptions.IgnoreCase));
+            return (contains, contains ? context.Request.Scheme + "://" + context.Connection.RemoteIpAddress.MapToIPv4().ToString() + url : "");
         }
     }
 }
