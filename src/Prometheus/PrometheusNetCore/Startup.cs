@@ -34,6 +34,7 @@ namespace PrometheusNetCore
         {
             #region Metrics
             services.AddPrometheusCore()
+                .UseSystemMetrics()
                 .UseHealthCheck(builder =>
                 {
                     builder.AddHealthCheck<HelloworldHealthCheck>("helloworld_health_check");
@@ -47,8 +48,10 @@ namespace PrometheusNetCore
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            app.UseMetricsAllMiddleware()
-                .UseMiddleware<HttpMetricsMiddleware>();
+            app.UseAppMetrics(metricsBuilder =>
+            {
+                metricsBuilder.MetricsAllMiddlewares();
+            });
 
             if (env.IsDevelopment())
             {

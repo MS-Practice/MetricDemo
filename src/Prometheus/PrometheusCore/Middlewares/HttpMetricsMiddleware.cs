@@ -63,7 +63,7 @@ namespace PrometheusCore.Middlewares
                         if (metrics.contains)
                         {
                             watch.Stop();
-                            _metrics.RecordEndpointsRequestTime(metrics.url, appMetricsContextName, watch.ElapsedMilliseconds);
+                            _metrics.RecordEndpointsRequestTime(appMetricsContextName, metrics.url, watch.ElapsedMilliseconds);
                         }
                         return Task.CompletedTask;
                     });

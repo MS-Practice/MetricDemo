@@ -12,10 +12,11 @@ namespace PrometheusCore
             this.builder = builder;
         }
 
-        public void MetricsAllMiddlewares()
+        public AppMetricsConfigurationBuilder MetricsAllMiddlewares()
         {
             builder.UseMetricsAllMiddleware();
             builder.UseMiddleware<HttpMetricsMiddleware>();
+            return this;
         }
     }
 }
