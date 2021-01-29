@@ -16,7 +16,7 @@ namespace JaegerNetCore.Controllers
         private readonly HttpClient _schoolClient;
         public SchoolController(IHttpClientFactory httpClientFactory)
         {
-            _schoolClient = httpClientFactory.CreateClient("openapi");
+            _schoolClient = httpClientFactory.CreateClient("jaegerclient");
         }
         /// <summary>
         /// 学校详情
@@ -82,5 +82,31 @@ namespace JaegerNetCore.Controllers
         }
 
 
+        /// <summary>
+        /// 学校详情，跨进程
+        /// </summary>
+        /// <param name="schoolId"></param>
+        /// <returns></returns>
+        [HttpGet("crossprocess/{schoolId}/grade/{gradeId}")]
+        public async Task<SchoolViewModel> GetSchoolDetailCrossProcessAsync(int schoolId, int gradeId)
+        {
+            SchoolViewModel school = new SchoolViewModel();
+            var responseMessage = await _schoolClient.GetAsync("/api/school/" + schoolId);
+            if (responseMessage.IsSuccessStatusCode)
+            {
+                var r = await ReadAsObjectAsync<DataResponse<SchoolViewModel>>(responseMessage.Content);
+                school = r.Data;
+            }
+
+            //var gradeId = new Random().Next(1, 14);
+            responseMessage = await _schoolClient.GetAsync($"/api/school/{schoolId}/grade/{gradeId}");
+            if (responseMessage.IsSuccessStatusCode)
+            {
+                var r = await ReadAsObjectAsync<DataResponse<List<ClassViewModel>>>(responseMessage.Content);
+                if (r.Data != null)
+                    school.Classes.AddRange(r.Data);
+            }
+            return school;
+        }
     }
 }

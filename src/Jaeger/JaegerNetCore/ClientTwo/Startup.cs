@@ -12,13 +12,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenTracing;
 using OpenTracing.Util;
-using RedisExtentions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace JaegerNetCore
+namespace ClientTwo
 {
     public class Startup
     {
@@ -32,16 +31,15 @@ namespace JaegerNetCore
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            RedisHelper.Initialization(csredis: new CSRedisClient(Configuration["Redis:RedisService"]));
-
-            services.AddHttpClient("jaegerclient",client => {
-                client.BaseAddress = new Uri("http://localhost:9002");
+            services.AddHttpClient("openapi", client => {
+                client.BaseAddress = new Uri("http://192.168.3.121:9002");
             });
+
             services.AddControllers();
 
             services.AddOpenTracing();
             // jaeger service
-            
+
             services.AddSingleton<ITracer>(serviceProvider =>
             {
                 string serviceName = serviceProvider.GetRequiredService<IWebHostEnvironment>().ApplicationName;
